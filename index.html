@@ -144,6 +144,9 @@ async function load() {
       marker.bindTooltip(waypoint.name,
       {
           permanent: true,
+          direction: 'bottom',
+          offset: [-14,25],
+
       })
       return marker;
     }
@@ -166,10 +169,11 @@ async function load() {
     let [currentLocation, distanceTraveled] = findPlaceOnRoute(MILES,route.coordinates)
     person = L.marker([currentLocation.lat,currentLocation.lng])
     pctComplete=Math.round(distanceTraveled/miles*1000)/10
-    person.bindTooltip(`${NAME} (${pctComplete}%)`,
+    person.bindTooltip(`${NAME}<br />${Math.round(MILES)} miles (${pctComplete}%)`,
     {
         permanent: true,
-        //direction: 'top'
+        direction: 'top',
+        offset: [-14,-20],
     })
     person.addTo(map);
   });

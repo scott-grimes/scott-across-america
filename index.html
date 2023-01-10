@@ -62,7 +62,7 @@ async function computeDistanceTravelled() {
   let sum = 0
   for (const row of res.data) {
     if ("miles" in row) {
-      sum+=row.miles
+      sum+=parseFloat(row.miles)
     }
   }
   return sum

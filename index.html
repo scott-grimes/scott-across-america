@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scott-Across-America</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css" integrity="sha512-hoalWLoI8r4UszCkZ5kL8vayOGVae1oxXe/2A4AO6J9+580uKHDO3JdHb7NzwwzK5xr/Fs0W40kiNHxM9vyTtQ==" crossorigin=""/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css" integrity="sha512-hoalWLoI8r4UszCkZ5kL8vayOGVae1oxXe/2A4AO6J9+580uKHDO3JdHb7NzwwzK5xr/Fs0W40kiNHxM9vyTtQ==" crossorigin=""/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+<script src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js" integrity="sha512-BB3hKbKWOc9Ez/TAwyWxNXeoV9c1v6FIeYiBieIWkpLjauysF18NzgR1MBNBXf8/KABdlkX68nAhlwcDFLGPCQ==" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+
+<!-- Occupy the entire browser window with no margins -->
+<style>
+html, body {
+  height: 100%;
+  margin: 0;
+}
+</style>
+</head>
+<body>
+<!-- The Leaflet map renders in this 100% high/wide div -->
+<div id="map" style="width: 100%; height: 100%;"></div>
+<script>
+NAME="Scott 🧙"
+LOG_CSV="https://raw.githubusercontent.com/scott-grimes/scott-across-america/master/log.csv"
+START_NAME="San Francisco"
+START_LAT=37.7199
+START_LON=-122.3554
+END_NAME="New York"
+END_LAT=40.7401
+END_LON=-74.0166
+
+function toPoint(s) {
+  // Convert "51.5,2.1" into [51.5, 2.1]
+  return s.split(",").map(parseFloat);
+}
+
+// Returns coordinate m miles from the first coordinate in the array of coordinates c
+// if m >= length of route, returns the last coordinate c
+function findPlaceOnRoute(miles,coords) {
+  // m is miles
+  // c is an array of LatLng coordinates
+  dest = miles*1609.34
+  traversed = 0
+  for (let i = 0; i < coords.length-1; i++) {
+    if (traversed >= dest) { return [coords[i], traversed/1609.34] }
+    traversed += coords[i].distanceTo(coords[i+1])
+  }
+  return [coords[coords.length-1], dest]
+}
+// let response = await fetch(
+//   `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&zoom=12&format=jsonv2`
+// )
+// let data = await response.json();
+
+async function computeDistanceTravelled() {
+  let response = await fetch(LOG_CSV)
+  let text = await response.text()
+  const res = Papa.parse(text, { header: true });
+  let sum = 0
+  for (const row of res.data) {
+    if ("miles" in row) {
+      sum+=row.miles
+    }
+  }
+  return sum
+}
+async function load() {
+  let MILES = await computeDistanceTravelled()
+  // URLSearchParams is a fantastic browser API - it makes it easy to both read
+  // query string parameters from the URL and later to generate new ones
+  let params = new URLSearchParams(location.search);
+  // If the starting URL is /?center=51,32&zoom=3 this will pull those values out
+  let center = params.get('center') || '0,0';
+  let initialZoom = params.get('zoom');
+  let zoom = parseInt(initialZoom || '2', 10);
+  let q = params.get('q');
+  // .getAll() turns &marker=51.49,0&marker=51.3,0.2 into ['51.49,0', '51.3,0.2']
+  let markers = params.getAll('marker');
+  // New York
+  // markers.push('40.7401,-74.0166')
+
+  // markers.push('37.7199,-122.3554')
+  // L.marker([40.7401,-74.0166]).addTo(map);
+  // zoomControl: false turns off the visible +/- zoom buttons in Leaflet
+  let map = L.map('map', { zoomControl: false }).setView(toPoint(center), zoom);
+  window.map = map
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    detectRetina: true
+  }).addTo(map);
+  // We only pay attention to ?q= if ?center= was not provided:
+  if (q && !params.get('center')) {
+    // We use fetch to pass ?q= to the Nominatim API and get back JSON
+    let response = await fetch(
+      `https://nominatim.openstreetmap.org/search.php?q=${encodeURIComponent(q)}&format=jsonv2`
+    )
+    let data = await response.json();
+
+    // data[0] is the first result - it has a boundingbox array of four floats
+    // which we can convert into a Leaflet-compatible bounding box like this:
+    let bounds = [
+      [data[0].boundingbox[0],data[0].boundingbox[2]],
+      [data[0].boundingbox[1],data[0].boundingbox[3]]
+    ];
+    // This sets both the map center and zooms to the correct level for the bbox:
+    map.fitBounds(bounds);
+    // User-provided zoom over-rides this
+    if (initialZoom) {
+      map.setZoom(parseInt(initialZoom));
+    }
+  }
+  // This is the code that updates the URL as the user pans or zooms around.
+  // You can subscribe to both the moveend and zoomend Leaflet events in one go:
+  map.on('moveend zoomend', () => {
+    // Update URL bar with current location
+    let newZoom = map.getZoom();
+    let center = map.getCenter();
+    // This time we use URLSearchParams to construct a center...=&zoom=... URL
+    let u = new URLSearchParams();
+    // Copy across ?marker=x&marker=y from existing URL, if they were set:
+    markers.forEach(s => u.append('marker', s));
+    u.append('center', `${center.lat},${center.lng}`);
+    u.append('zoom', newZoom);
+    // replaceState() is a weird API - the third argument is the one we care about:
+    history.replaceState(null, null, '?' + u.toString());
+  });
+  // This bit adds Leaflet markers to the map for ?marker= query string arguments:
+  // markers.forEach(s => {
+  //   L.marker(toPoint(s)).addTo(map);
+  // });
+
+  var plan = L.Routing.plan([
+    {latLng: L.latLng(START_LAT,START_LON), name: `${START_NAME} (start)`},
+    {latLng: L.latLng(END_LAT,END_LON), name: `${END_NAME} (end)`},
+  ],{
+    draggableWaypoints: false,
+    addWaypoints: false,
+    createMarker: function(i,waypoint,n){
+      marker = L.marker(waypoint.latLng);
+      marker.bindTooltip(waypoint.name,
+      {
+          permanent: true,
+      })
+      return marker;
+    }
+  })
+
+  var control = L.Routing.control({
+    routeWhileDragging: false,
+    autoRoute: false,
+    plan: plan,
+    show: false,
+    lineOptions: {
+      addWaypoints: false
+    },
+
+  })
+  control.on('routesfound', function (e) {
+    route = e.routes[0]
+    window.route = route
+    miles = Math.round(route.summary.totalDistance*0.000621371*10)/10
+    let [currentLocation, distanceTraveled] = findPlaceOnRoute(MILES,route.coordinates)
+    person = L.marker([currentLocation.lat,currentLocation.lng])
+    pctComplete=Math.round(distanceTraveled/miles*1000)/10
+    person.bindTooltip(`${NAME} (${pctComplete}%)`,
+    {
+        permanent: true,
+        //direction: 'top'
+    })
+    person.addTo(map);
+  });
+  control.on('routingerror', function (e) {
+      console.log(e);
+  });
+  control.route()
+  control.addTo(map);
+}
+load()
+</script>
+</body>
+</html>

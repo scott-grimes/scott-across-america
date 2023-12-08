@@ -25,12 +25,23 @@ html, body {
 <script>
 NAME="Scott 🧙"
 LOG_CSV="https://raw.githubusercontent.com/scott-grimes/scott-across-america/master/log.csv"
-START_NAME="San Francisco"
-START_LAT=37.7199
-START_LON=-122.3554
-END_NAME="New York"
-END_LAT=40.7401
-END_LON=-74.0166
+WAYPOINTS=[
+  {
+    "name": "DRW Chicago - start",
+    "lat": 41.882318308581986,
+    "lon": -87.6413704023735
+  },
+  {
+    "name": "DRW Montreal - 845mi",
+    "lat": 45.495848634687356,
+    "lon": -73.57271855165507
+  },
+  {
+    "name": "DRW New York - 1222mi",
+    "lat": 40.712010930986416,
+    "lon": -74.01560821731404
+  }
+]
 
 function toPoint(s) {
   // Convert "51.5,2.1" into [51.5, 2.1]
@@ -133,10 +144,9 @@ async function load() {
   //   L.marker(toPoint(s)).addTo(map);
   // });
 
-  var plan = L.Routing.plan([
-    {latLng: L.latLng(START_LAT,START_LON), name: `${START_NAME} (start)`},
-    {latLng: L.latLng(END_LAT,END_LON), name: `${END_NAME} (end)`},
-  ],{
+  var plan = L.Routing.plan(
+    WAYPOINTS.map((v,idx) => {return {"latLng": L.latLng(v.lat,v.lon), "name": v.name}})
+    ,{
     draggableWaypoints: false,
     addWaypoints: false,
     createMarker: function(i,waypoint,n){

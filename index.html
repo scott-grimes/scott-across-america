@@ -27,19 +27,30 @@ NAME="Scott 🧙"
 LOG_CSV="https://raw.githubusercontent.com/scott-grimes/scott-across-america/master/log.csv"
 WAYPOINTS=[
   {
-    "name": "DRW Chicago - start",
-    "lat": 41.882318308581986,
-    "lon": -87.6413704023735
+    "name": "Pseudo Crest Trail - Southern Terminus",
+    "lat": 32.59437281087691,
+    "lon": -116.52762259078388
   },
   {
-    "name": "DRW Montreal - 845mi",
-    "lat": 45.495848634687356,
-    "lon": -73.57271855165507
+    "lat": 32.86127726444002,
+    "lon": -117.11149543144136
   },
   {
-    "name": "DRW New York - 1222mi",
-    "lat": 40.712010930986416,
-    "lon": -74.01560821731404
+    "lat": 38.56858375261133,
+    "lon": -121.5095546653837
+  },
+  {
+    "lat": 41.9982595585644,
+    "lon": -122.61031654589156
+  },
+  {
+    "lat": 45.48297709042292,
+    "lon": -122.67612065496151
+  },
+  {
+    "name": "Pseudo Crest Trail - Northern Terminus",
+    "lat": 49.00170901883017,
+    "lon": -122.75447737480272
   }
 ]
 
@@ -150,6 +161,10 @@ async function load() {
     draggableWaypoints: false,
     addWaypoints: false,
     createMarker: function(i,waypoint,n){
+      // ignore markers in middle of trip
+      if (i != 0 && i != (n-1)) {
+        return null
+      }
       marker = L.marker(waypoint.latLng);
       marker.bindTooltip(waypoint.name,
       {
